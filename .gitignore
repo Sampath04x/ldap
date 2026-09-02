@@ -1,0 +1,14 @@
+.env
+*.pyc
+__pycache__/
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+.next/
+node_modules/
+pgdata/
+*.pem
+*.key
+*.crt
