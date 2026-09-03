@@ -61,9 +61,9 @@ class DiagnosticEngine:
         if not check_ldap_conf.passed:
             # Skip 5, 6, 7
             checks.extend([
-                DiagnosticCheck(name="LDAP Connectivity", passed=False, code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to missing LDAP config"),
-                DiagnosticCheck(name="Group Membership", passed=False, code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to missing LDAP config"),
-                DiagnosticCheck(name="Group Mapping Freshness", passed=False, code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to missing LDAP config")
+                DiagnosticCheck(name="LDAP Connectivity", passed=False, status="SKIPPED", code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to missing LDAP configuration"),
+                DiagnosticCheck(name="Group Membership", passed=False, status="SKIPPED", code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to missing LDAP configuration"),
+                DiagnosticCheck(name="Group Mapping Freshness", passed=False, status="SKIPPED", code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to missing LDAP configuration")
             ])
             user_groups = []
         else:
@@ -71,13 +71,21 @@ class DiagnosticEngine:
             check_ldap_conn = await self._check_ldap_connectivity(firewall_id, ldap_configs)
             checks.append(check_ldap_conn)
             
-            # 6. Group Membership
-            check_group, user_groups = await self._check_group_membership(username, firewall_id)
-            checks.append(check_group)
-            
-            # 7. Group Mapping Freshness
-            check_group_map = await self._check_group_mapping_freshness(firewall_id)
-            checks.append(check_group_map)
+            if not check_ldap_conn.passed:
+                # Skip 6 & 7 because LDAP connectivity failed
+                checks.extend([
+                    DiagnosticCheck(name="Group Membership", passed=False, status="SKIPPED", code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to LDAP server connectivity failure"),
+                    DiagnosticCheck(name="Group Mapping Freshness", passed=False, status="SKIPPED", code=DiagnosticCode.SKIPPED.value, severity="info", detail="Skipped due to LDAP server connectivity failure")
+                ])
+                user_groups = []
+            else:
+                # 6. Group Membership
+                check_group, user_groups = await self._check_group_membership(username, firewall_id)
+                checks.append(check_group)
+                
+                # 7. Group Mapping Freshness
+                check_group_map = await self._check_group_mapping_freshness(firewall_id)
+                checks.append(check_group_map)
 
         # 8. Auth History
         check_auth = await self._check_auth_history(username, firewall_id)
@@ -170,16 +178,23 @@ class DiagnosticEngine:
     async def _check_user_identity(self, username: str, firewall_id: str) -> DiagnosticCheck:
         ident = await self.provider.get_user_identity(username, firewall_id)
         if not ident.found:
+            if "directory" in ident.detail.lower():
+                return DiagnosticCheck(
+                    name="User Identity", passed=False, status="FAILED",
+                    code=DiagnosticCode.USER_NOT_FOUND.value, severity="high",
+                    detail=f"User '{username}' does not exist in Active Directory.",
+                    evidence=f"Queried directory store for user '{username}'", action="Verify username spelling in directory."
+                )
             return DiagnosticCheck(
                 name="User Identity", passed=False, status="FAILED",
-                code=DiagnosticCode.USER_NOT_FOUND.value, severity="high",
-                detail=f"User '{username}' not found in firewall identity store.",
-                evidence=f"Queried identity store for user '{username}'", action="Verify username spelling or check identity agent mapping."
+                code=DiagnosticCode.USER_NOT_IDENTIFIED.value, severity="high",
+                detail=f"User '{username}' exists in directory, but target firewall has no active User-ID session mapping for this user.",
+                evidence=f"Identity check: {ident.detail}", action="Verify Captive Portal, GlobalProtect VPN login, or User-ID Agent mapping."
             )
         if ident.status == "disabled" or ident.status == "locked":
             return DiagnosticCheck(
                 name="User Identity", passed=False, status="FAILED",
-                code=DiagnosticCode.USER_NOT_IDENTIFIED.value, severity="high",
+                code=DiagnosticCode.USER_INACTIVE.value, severity="high",
                 detail=f"User '{username}' is present but status is {ident.status}.",
                 evidence=f"Account status: {ident.status}, DN: {ident.ldap_dn}", action="Unlock or enable user account in Active Directory."
             )
@@ -391,9 +406,9 @@ class DiagnosticEngine:
                 return DiagnosticCheck(
                     name="Identity Consistency", passed=False, status="WARNING",
                     code=DiagnosticCode.IDENTITY_INCONSISTENT.value, severity="high",
-                    detail=f"Conflicting active IP mappings detected across multiple firewalls: {list(all_ips)}",
-                    evidence=f"User concurrently mapped across {distinct_fw_count} firewalls with {len(all_ips)} distinct IPs",
-                    action="Check for IP address overlap or stale User-ID mapping sessions."
+                    detail=f"Potential conflicting active identity session mappings detected across {distinct_fw_count} firewalls.",
+                    evidence=f"User concurrently mapped across {distinct_fw_count} firewalls with {len(all_ips)} distinct IPs: {list(all_ips)}",
+                    action="Check for roaming sessions, VPN contexts, or stale User-ID mapping cache."
                 )
 
         return DiagnosticCheck(

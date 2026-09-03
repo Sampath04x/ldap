@@ -1,5 +1,5 @@
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Any, Optional, Generic, TypeVar, Literal
+from pydantic import BaseModel, ConfigDict, Field, IPvAnyAddress
+from typing import Any, Optional, Generic, TypeVar, Literal, Union
 from datetime import datetime
 from uuid import UUID
 
@@ -48,7 +48,7 @@ class GroupResponse(BaseModel):
 class FirewallSummary(BaseModel):
     id: UUID
     hostname: str
-    ip_address: str
+    ip_address: Union[IPvAnyAddress, str]
     environment: str
     status: str
     model_config = ConfigDict(from_attributes=True)
@@ -56,7 +56,7 @@ class FirewallSummary(BaseModel):
 class FirewallResponse(BaseModel):
     id: UUID
     hostname: str
-    ip_address: str
+    ip_address: Union[IPvAnyAddress, str]
     model: Optional[str] = None
     software_version: Optional[str] = None
     environment: str
@@ -85,7 +85,7 @@ class UserIPMappingResponse(BaseModel):
     id: int
     user_id: UUID
     firewall_id: UUID
-    ip_address: str
+    ip_address: Union[IPvAnyAddress, str]
     mapped_at: datetime
     expires_at: Optional[datetime] = None
     is_current: bool
@@ -98,12 +98,24 @@ class AuthEventResponse(BaseModel):
     user_id: Optional[UUID] = None
     firewall_id: UUID
     username_raw: str
-    source_ip: Optional[str] = None
+    source_ip: Optional[Union[IPvAnyAddress, str]] = None
     result: str
     failure_reason: Optional[str] = None
     auth_method: Optional[str] = None
     occurred_at: datetime
     created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class AuditLogResponse(BaseModel):
+    id: int
+    actor: str
+    action: str
+    resource_type: Optional[str] = None
+    resource_id: Optional[str] = None
+    request_ip: Optional[Union[IPvAnyAddress, str]] = None
+    request_id: Optional[str] = None
+    extra: Optional[dict] = None
+    occurred_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
 class SearchItem(BaseModel):
@@ -158,10 +170,18 @@ class PagedResponse(BaseModel, Generic[T]):
     has_more: bool
     next_cursor: Optional[KeysetCursor] = None
 
+class OffsetPageResponse(BaseModel, Generic[T]):
+    items: list[T]
+    total: int
+    page: int
+    page_size: int
+    has_more: bool
+
 class ErrorDetail(BaseModel):
     code: str
     message: str
     request_id: Optional[str] = None
+    details: Optional[list[Any]] = None
 
 class ErrorResponse(BaseModel):
     error: ErrorDetail

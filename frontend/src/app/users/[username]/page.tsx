@@ -78,7 +78,7 @@ export default function UserDetailPage() {
         <div className="lg:col-span-2 space-y-8">
           <section>
             <h2 className="text-xl font-semibold mb-4 text-gray-900">IP Mappings</h2>
-            {mappings ? <IPMappingTable mappings={mappings} /> : <Skeleton className="h-32" />}
+            {mappings ? <IPMappingTable mappings={mappings.items} /> : <Skeleton className="h-32" />}
           </section>
           <section>
             <h2 className="text-xl font-semibold mb-4 text-gray-900">Recent Auth Events</h2>
@@ -88,7 +88,7 @@ export default function UserDetailPage() {
         <div className="space-y-8">
           <section className="bg-white border rounded-xl p-5 shadow-sm">
             <h2 className="text-lg font-semibold mb-4 text-gray-900">Group Memberships</h2>
-            {groups ? <GroupList groups={groups} /> : <Skeleton className="h-24" />}
+            {groups ? <GroupList groups={groups.items} /> : <Skeleton className="h-24" />}
           </section>
         </div>
       </div>

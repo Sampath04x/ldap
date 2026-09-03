@@ -1,6 +1,6 @@
 import type {
   User, Group, IPMapping, AuthEvent, Firewall, LDAPServer,
-  DiagnosticRun, SearchResult, PagedResponse, KeysetResponse, HealthResponse
+  DiagnosticRun, SearchResult, PagedResponse, KeysetResponse, OffsetPageResponse, HealthResponse
 } from './types'
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
@@ -35,8 +35,18 @@ async function apiFetch<T>(path: string, options?: RequestInit): Promise<T> {
 
 // User endpoints
 export const getUser = (username: string) => apiFetch<User>(`/api/v1/users/${username}`)
-export const getUserGroups = (username: string) => apiFetch<Group[]>(`/api/v1/users/${username}/groups`)
-export const getUserMappings = (username: string) => apiFetch<IPMapping[]>(`/api/v1/users/${username}/mappings`)
+export const getUserGroups = (username: string, page?: number) => {
+  const query = new URLSearchParams()
+  if (page) query.append('page', String(page))
+  const qs = query.toString()
+  return apiFetch<OffsetPageResponse<Group>>(`/api/v1/users/${username}/groups${qs ? `?${qs}` : ''}`)
+}
+export const getUserMappings = (username: string, page?: number) => {
+  const query = new URLSearchParams()
+  if (page) query.append('page', String(page))
+  const qs = query.toString()
+  return apiFetch<OffsetPageResponse<IPMapping>>(`/api/v1/users/${username}/mappings${qs ? `?${qs}` : ''}`)
+}
 export const getUserEvents = (username: string, params?: { after_id?: number, after_ts?: string, result?: string, page_size?: number }) => {
   const query = new URLSearchParams()
   if (params?.after_id) query.append('after_id', String(params.after_id))
@@ -49,12 +59,13 @@ export const getUserEvents = (username: string, params?: { after_id?: number, af
 
 // Firewall endpoints
 export const getFirewall = (id: string) => apiFetch<Firewall>(`/api/v1/firewalls/${id}`)
-export const getFirewalls = (params?: { status?: string, page?: number }) => {
+export const getFirewalls = (params?: { status?: string, page?: number, page_size?: number }) => {
   const query = new URLSearchParams()
   if (params?.status) query.append('status', params.status)
   if (params?.page) query.append('page', String(params.page))
+  if (params?.page_size) query.append('page_size', String(params.page_size))
   const qs = query.toString()
-  return apiFetch<PagedResponse<Firewall>>(`/api/v1/firewalls${qs ? `?${qs}` : ''}`)
+  return apiFetch<OffsetPageResponse<Firewall>>(`/api/v1/firewalls${qs ? `?${qs}` : ''}`)
 }
 export const getFirewallLDAP = (id: string) => apiFetch<LDAPServer[]>(`/api/v1/firewalls/${id}/ldap`)
 
