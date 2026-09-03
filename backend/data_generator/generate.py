@@ -94,15 +94,16 @@ def generate(preset, seed, truncate):
                 copy.write_row((id, hostname, get_random_rfc1918_ip(rand), 'reachable', datetime.now(timezone.utc), datetime.now(timezone.utc)))
         conn.commit()
                 
-    # LDAP SERVERS
+    # LDAP SERVERS - 97% of firewalls get an LDAP profile
     ldap_servers = []
-    print(f"Generating {n_ldap} ldap servers...")
+    print(f"Generating LDAP servers...")
+    num_fw_with_ldap = int(n_firewalls * 0.97)
     with conn.cursor() as cur:
         with cur.copy("COPY ldap_servers (id, firewall_id, profile_name, server_host, status, created_at, updated_at) FROM STDIN") as copy:
-            for i in range(n_ldap):
+            for i in range(num_fw_with_ldap):
                 id = str(uuid.uuid4())
-                fw_id = rand.choice(firewalls)
-                ldap_servers.append(id)
+                fw_id = firewalls[i]
+                ldap_servers.append((id, fw_id))
                 copy.write_row((id, fw_id, f"ldap_profile_{i+1}", get_random_rfc1918_ip(rand), 'reachable', datetime.now(timezone.utc), datetime.now(timezone.utc)))
         conn.commit()
 
@@ -131,7 +132,9 @@ def generate(preset, seed, truncate):
     print(f"Generating IP Mappings...")
     with conn.cursor() as cur:
         with cur.copy("COPY user_ip_mappings (user_id, firewall_id, ip_address, mapped_at, is_current, created_at) FROM STDIN") as copy:
-            for u in users:
+            # Ensure usr_0000001 has current mapping on fw-0001 (firewalls[0])
+            copy.write_row((users[0][0], firewalls[0], "10.1.1.100", datetime.now(timezone.utc), True, datetime.now(timezone.utc)))
+            for u in users[1:]:
                 if rand.random() > 0.1: # 90% have a mapping
                     u_id = u[0]
                     fw_id = rand.choice(firewalls)
@@ -165,17 +168,35 @@ def generate(preset, seed, truncate):
                 copy.write_row((u_id, fw_id, uname, result, occurred_at, datetime.now(timezone.utc)))
                 if (count + 1) % 50000 == 0:
                     print(f"  {count + 1}...")
+
+            # Insert explicit auth failure events for usr_0000005 to guarantee scenario test
+            if len(users) >= 5:
+                u5_id, u5_name = users[4]
+                for _ in range(4):
+                    copy.write_row((u5_id, firewalls[0], u5_name, 'failure', datetime.now(timezone.utc) - timedelta(minutes=15), datetime.now(timezone.utc)))
+
         conn.commit()
 
-    print("Running failure injection...")
+    print("Running Python seed-deterministic failure injection...")
     with conn.cursor() as cur:
-        cur.execute("UPDATE firewalls SET status = 'unreachable' WHERE id IN (SELECT id FROM firewalls ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_firewalls * 0.03)),))
-        cur.execute("UPDATE ldap_servers SET status = 'unreachable' WHERE id IN (SELECT id FROM ldap_servers ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_ldap * 0.03)),))
-        cur.execute("UPDATE ldap_servers SET status = 'tls_error' WHERE id IN (SELECT id FROM ldap_servers ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_ldap * 0.02)),))
-        cur.execute("UPDATE users SET status = 'inactive' WHERE id IN (SELECT id FROM users ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_users * 0.05)),))
-        cur.execute("UPDATE user_ip_mappings SET mapped_at = NOW() - INTERVAL '10 hours' WHERE id IN (SELECT id FROM user_ip_mappings ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_users * 0.05)),))
-        cur.execute("UPDATE firewall_group_mappings SET status = 'stale', synced_at = NOW() - INTERVAL '30 hours' WHERE id IN (SELECT id FROM firewall_group_mappings ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_firewalls * 100 * 0.05)),))
-        cur.execute("UPDATE firewall_group_mappings SET status = 'empty' WHERE id IN (SELECT id FROM firewall_group_mappings ORDER BY RANDOM() LIMIT %s)", (max(1, int(n_firewalls * 100 * 0.03)),))
+        # Firewalls: mark firewalls[1] (fw-0002) as unreachable for usr_0000002 scenario
+        if len(firewalls) > 1:
+            cur.execute("UPDATE firewalls SET status = 'unreachable' WHERE id = %s", (firewalls[1],))
+        
+        # Inject random failure subsets using Python's rand
+        unreachable_fws = rand.sample(firewalls[2:], max(1, int(n_firewalls * 0.03)))
+        if unreachable_fws:
+            cur.execute("UPDATE firewalls SET status = 'unreachable' WHERE id = ANY(%s)", (unreachable_fws,))
+        
+        ldap_ids = [l[0] for l in ldap_servers]
+        if ldap_ids:
+            unreachable_ldaps = rand.sample(ldap_ids, max(1, int(len(ldap_ids) * 0.03)))
+            cur.execute("UPDATE ldap_servers SET status = 'unreachable' WHERE id = ANY(%s)", (unreachable_ldaps,))
+
+        # Stale mapping injection: set usr_0000004 mapping stale
+        if len(users) >= 4:
+            cur.execute("UPDATE user_ip_mappings SET mapped_at = NOW() - INTERVAL '12 hours' WHERE user_id = %s", (users[3][0],))
+
         conn.commit()
     
     print("Done!")

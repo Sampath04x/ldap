@@ -160,7 +160,7 @@ def upgrade() -> None:
         sa.Column('auth_method', sa.String(length=32), nullable=True),
         sa.Column('occurred_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
-        sa.CheckConstraint("auth_method IN ('kerberos','ntlm','radius','local')"),
+        sa.CheckConstraint("auth_method IN ('kerberos','ntlm','radius','local') OR auth_method IS NULL"),
         sa.CheckConstraint("failure_reason IN ('bad_password','account_locked','ldap_error','timeout','unknown') OR failure_reason IS NULL"),
         sa.CheckConstraint("result IN ('success','failure','timeout','unknown')"),
         sa.ForeignKeyConstraint(['firewall_id'], ['firewalls.id'], ),
@@ -179,7 +179,7 @@ def upgrade() -> None:
         sa.Column('status', sa.String(length=16), nullable=False),
         sa.Column('overall_result', sa.String(length=32), nullable=False),
         sa.Column('overall_status', sa.String(length=16), nullable=False),
-        sa.Column('results_json', sa.JSON(), nullable=False),
+        sa.Column('results_json', postgresql.JSONB(astext_type=sa.Text()), nullable=False),
         sa.Column('triggered_by', sa.String(length=64), nullable=True),
         sa.Column('duration_ms', sa.Integer(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
@@ -199,7 +199,7 @@ def upgrade() -> None:
         sa.Column('resource_id', sa.Text(), nullable=True),
         sa.Column('request_ip', sa.String(length=45), nullable=True),
         sa.Column('request_id', sa.String(length=36), nullable=True),
-        sa.Column('extra', sa.JSON(), nullable=True),
+        sa.Column('extra', postgresql.JSONB(astext_type=sa.Text()), nullable=True),
         sa.Column('occurred_at', sa.DateTime(timezone=True), server_default=sa.text('now()'), nullable=False),
         sa.PrimaryKeyConstraint('id')
     )

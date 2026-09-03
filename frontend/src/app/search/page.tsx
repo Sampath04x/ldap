@@ -2,12 +2,12 @@
 
 import { useSearchParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { search } from '../../lib/api'
-import { UserCard } from '../../components/UserCard'
-import { FirewallCard } from '../../components/FirewallCard'
-import { Skeleton } from '../../components/Skeleton'
-import { ErrorState } from '../../components/ErrorState'
-import { EmptyState } from '../../components/EmptyState'
+import { search } from '@/lib/api'
+import { UserCard } from '@/components/UserCard'
+import { FirewallCard } from '@/components/FirewallCard'
+import { Skeleton } from '@/components/Skeleton'
+import { ErrorState } from '@/components/ErrorState'
+import { EmptyState } from '@/components/EmptyState'
 import { useState } from 'react'
 
 export default function SearchPage() {

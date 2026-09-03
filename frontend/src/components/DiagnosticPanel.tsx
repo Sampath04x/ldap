@@ -1,4 +1,4 @@
-import type { DiagnosticRun, DiagnosticCheck } from '../../lib/types'
+import type { DiagnosticRun, DiagnosticCheck } from '@/lib/types'
 import { CheckCircle2, XCircle, MinusCircle, AlertTriangle, Info, Terminal, Wrench } from 'lucide-react'
 
 export function DiagnosticPanel({ run }: { run: DiagnosticRun }) {

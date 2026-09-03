@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, or_
+from sqlalchemy import select, func, or_, desc, asc
 from app.models import User, Firewall, Group, UserIPMapping
 from app.schemas import SearchResult, SearchItem
 import re
@@ -9,129 +9,146 @@ class SearchService:
                      status: str = None, page: int = 1, page_size: int = 25, 
                      sort: str = None, order: str = 'asc') -> SearchResult:
         
-        items = []
-        is_ip = bool(re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', q))
         offset = (page - 1) * page_size
+        is_ip = bool(re.match(r'^(?:[0-9]{1,3}\.){3}[0-9]{1,3}$', q))
         
-        if field:
-            if field == 'username' and type in ('all', 'user'):
-                items.extend(await self._search_users(db, q, True, status))
-            elif field == 'email' and type in ('all', 'user'):
-                items.extend(await self._search_users_by_email(db, q, status))
-            elif field == 'ip' and type in ('all', 'user'):
-                items.extend(await self._search_by_ip(db, q, status))
-            elif field == 'hostname' and type in ('all', 'firewall'):
-                items.extend(await self._search_firewalls(db, q, True, status))
-            elif field == 'group_name' and type in ('all', 'group'):
-                items.extend(await self._search_groups(db, q, True, status))
-        else:
-            if is_ip and type in ('all', 'user'):
-                items.extend(await self._search_by_ip(db, q, status))
-            else:
-                if type in ('all', 'user'):
-                    items.extend(await self._search_users(db, q, False, status))
-                if type in ('all', 'firewall'):
-                    items.extend(await self._search_firewalls(db, q, False, status))
-                if type in ('all', 'group'):
-                    items.extend(await self._search_groups(db, q, False, status))
+        items = []
+        total = 0
 
-        items.sort(key=lambda x: x.score, reverse=True)
-        total = len(items)
-        paginated_items = items[offset:offset + page_size]
-        
+        # Handle specific target searches
+        if type == 'user' or (field in ('username', 'email', 'ip')):
+            items, total = await self._search_users_paginated(db, q, field, is_ip, status, page_size, offset, sort, order)
+        elif type == 'firewall' or (field == 'hostname'):
+            items, total = await self._search_firewalls_paginated(db, q, field, status, page_size, offset, sort, order)
+        elif type == 'group' or (field == 'group_name'):
+            items, total = await self._search_groups_paginated(db, q, field, status, page_size, offset, sort, order)
+        else:
+            # Type is 'all'
+            user_items, user_total = await self._search_users_paginated(db, q, field, is_ip, status, 15, 0, sort, order)
+            fw_items, fw_total = await self._search_firewalls_paginated(db, q, field, status, 15, 0, sort, order)
+            grp_items, grp_total = await self._search_groups_paginated(db, q, field, status, 15, 0, sort, order)
+            
+            all_items = user_items + fw_items + grp_items
+            all_items.sort(key=lambda x: x.score, reverse=True)
+            total = user_total + fw_total + grp_total
+            items = all_items[offset:offset + page_size]
+
         return SearchResult(
-            items=paginated_items,
+            items=items,
             total=total,
             page=page,
             page_size=page_size,
             has_more=offset + page_size < total
         )
 
-    async def _search_users(self, db: AsyncSession, q: str, exact: bool, status: str = None) -> list[SearchItem]:
-        query = select(User)
-        if exact:
-            query = query.where(User.username == q)
+    async def _search_users_paginated(self, db: AsyncSession, q: str, field: str | None, is_ip: bool, 
+                                      status: str | None, limit: int, offset: int, 
+                                      sort: str | None, order: str) -> tuple[list[SearchItem], int]:
+        base_query = select(User)
+        
+        if field == 'username':
+            base_query = base_query.where(User.username == q)
+        elif field == 'email':
+            base_query = base_query.where(User.email == q)
+        elif field == 'ip' or is_ip:
+            base_query = base_query.join(UserIPMapping).where(UserIPMapping.ip_address == q)
         else:
             safe_q = q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-            query = query.where(
+            base_query = base_query.where(
                 or_(
                     User.username.ilike(f"%{safe_q}%"),
                     func.similarity(User.display_name, q) > 0.3
                 )
             )
+            
         if status:
-            query = query.where(User.status == status)
-        
-        result = await db.execute(query.limit(50))
-        return [
+            base_query = base_query.where(User.status == status)
+
+        # Count total matching
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total_res = await db.execute(count_query)
+        total = total_res.scalar_one_or_none() or 0
+
+        # Apply sorting
+        if sort and hasattr(User, sort):
+            col = getattr(User, sort)
+            base_query = base_query.order_by(desc(col) if order.lower() == 'desc' else asc(col))
+        else:
+            base_query = base_query.order_by(User.username.asc())
+
+        # Apply DB pagination
+        res = await db.execute(base_query.offset(offset).limit(limit))
+        users = res.scalars().all()
+
+        items = [
             SearchItem(
                 type='user',
                 score=1.0 if u.username == q else 0.5,
                 data={"id": str(u.id), "username": u.username, "display_name": u.display_name, "status": u.status}
-            ) for u in result.scalars().all()
+            ) for u in users
         ]
+        return items, total
 
-    async def _search_users_by_email(self, db: AsyncSession, q: str, status: str = None) -> list[SearchItem]:
-        query = select(User).where(User.email == q)
-        if status:
-            query = query.where(User.status == status)
-        result = await db.execute(query.limit(50))
-        return [
-            SearchItem(
-                type='user',
-                score=1.0,
-                data={"id": str(u.id), "username": u.username, "display_name": u.display_name, "status": u.status}
-            ) for u in result.scalars().all()
-        ]
-
-    async def _search_firewalls(self, db: AsyncSession, q: str, exact: bool, status: str = None) -> list[SearchItem]:
-        query = select(Firewall)
-        if exact:
-            query = query.where(Firewall.hostname == q)
-        else:
+    async def _search_firewalls_paginated(self, db: AsyncSession, q: str, field: str | None, 
+                                          status: str | None, limit: int, offset: int, 
+                                          sort: str | None, order: str) -> tuple[list[SearchItem], int]:
+        base_query = select(Firewall)
+        if field == 'hostname' or q:
             safe_q = q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-            query = query.where(Firewall.hostname.ilike(f"%{safe_q}%"))
+            base_query = base_query.where(Firewall.hostname.ilike(f"%{safe_q}%"))
         if status:
-            query = query.where(Firewall.status == status)
-        
-        result = await db.execute(query.limit(50))
-        return [
+            base_query = base_query.where(Firewall.status == status)
+
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total_res = await db.execute(count_query)
+        total = total_res.scalar_one_or_none() or 0
+
+        if sort and hasattr(Firewall, sort):
+            col = getattr(Firewall, sort)
+            base_query = base_query.order_by(desc(col) if order.lower() == 'desc' else asc(col))
+        else:
+            base_query = base_query.order_by(Firewall.hostname.asc())
+
+        res = await db.execute(base_query.offset(offset).limit(limit))
+        firewalls = res.scalars().all()
+
+        items = [
             SearchItem(
                 type='firewall',
                 score=1.0 if f.hostname == q else 0.5,
                 data={"id": str(f.id), "hostname": f.hostname, "ip_address": f.ip_address, "status": f.status}
-            ) for f in result.scalars().all()
+            ) for f in firewalls
         ]
+        return items, total
 
-    async def _search_groups(self, db: AsyncSession, q: str, exact: bool, status: str = None) -> list[SearchItem]:
-        query = select(Group)
-        if exact:
-            query = query.where(Group.group_name == q)
-        else:
+    async def _search_groups_paginated(self, db: AsyncSession, q: str, field: str | None, 
+                                       status: str | None, limit: int, offset: int, 
+                                       sort: str | None, order: str) -> tuple[list[SearchItem], int]:
+        base_query = select(Group)
+        if field == 'group_name' or q:
             safe_q = q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-            query = query.where(Group.group_name.ilike(f"%{safe_q}%"))
+            base_query = base_query.where(Group.group_name.ilike(f"%{safe_q}%"))
         if status:
-            query = query.where(Group.status == status)
-            
-        result = await db.execute(query.limit(50))
-        return [
+            base_query = base_query.where(Group.status == status)
+
+        count_query = select(func.count()).select_from(base_query.subquery())
+        total_res = await db.execute(count_query)
+        total = total_res.scalar_one_or_none() or 0
+
+        if sort and hasattr(Group, sort):
+            col = getattr(Group, sort)
+            base_query = base_query.order_by(desc(col) if order.lower() == 'desc' else asc(col))
+        else:
+            base_query = base_query.order_by(Group.group_name.asc())
+
+        res = await db.execute(base_query.offset(offset).limit(limit))
+        groups = res.scalars().all()
+
+        items = [
             SearchItem(
                 type='group',
                 score=1.0 if g.group_name == q else 0.5,
                 data={"id": str(g.id), "group_name": g.group_name, "status": g.status}
-            ) for g in result.scalars().all()
+            ) for g in groups
         ]
-        
-    async def _search_by_ip(self, db: AsyncSession, ip: str, status: str = None) -> list[SearchItem]:
-        query = select(User).join(UserIPMapping).where(UserIPMapping.ip_address == ip)
-        if status:
-            query = query.where(User.status == status)
-        
-        result = await db.execute(query.limit(50))
-        return [
-            SearchItem(
-                type='user',
-                score=1.0,
-                data={"id": str(u.id), "username": u.username, "display_name": u.display_name, "status": u.status}
-            ) for u in result.scalars().all()
-        ]
+        return items, total

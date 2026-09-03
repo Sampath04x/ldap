@@ -172,7 +172,7 @@ class DiagnosticEngine:
         if not ident.found:
             return DiagnosticCheck(
                 name="User Identity", passed=False, status="FAILED",
-                code=DiagnosticCode.USER_NOT_FOUND.value, severity="critical",
+                code=DiagnosticCode.USER_NOT_FOUND.value, severity="high",
                 detail=f"User '{username}' not found in firewall identity store.",
                 evidence=f"Queried identity store for user '{username}'", action="Verify username spelling or check identity agent mapping."
             )
@@ -313,10 +313,10 @@ class DiagnosticEngine:
         user = result.scalar_one_or_none()
         if not user:
             return DiagnosticCheck(
-                name="Authentication History", passed=True, status="PASSED",
-                code=DiagnosticCode.OK.value, severity="info",
-                detail="Cannot verify auth history for unknown user.",
-                evidence="User missing from DB", action=None
+                name="Authentication History", passed=False, status="SKIPPED",
+                code=DiagnosticCode.SKIPPED.value, severity="info",
+                detail="Skipped authentication history check because user does not exist.",
+                evidence="User identity missing from DB", action=None
             )
             
         recent = datetime.now(timezone.utc).timestamp() - (self.settings.auth_failure_window_hours * 3600)
@@ -350,22 +350,33 @@ class DiagnosticEngine:
         )
 
     async def _check_identity_consistency(self, username: str, firewall_id: str) -> DiagnosticCheck:
-        # Check if user has conflicting IP mappings across different firewalls
         result = await self.db.execute(select(User).where(User.username == username))
         user = result.scalar_one_or_none()
         if user:
+            recent_cutoff = datetime.now(timezone.utc) - timedelta(hours=self.settings.ip_mapping_stale_hours)
             ip_res = await self.db.execute(
                 select(UserIPMapping)
-                .where(UserIPMapping.user_id == user.id, UserIPMapping.is_current == True)
+                .where(
+                    UserIPMapping.user_id == user.id, 
+                    UserIPMapping.is_current == True,
+                    UserIPMapping.mapped_at >= recent_cutoff
+                )
             )
             current_mappings = ip_res.scalars().all()
-            unique_ips = set(m.ip_address for m in current_mappings)
-            if len(unique_ips) > 1:
+            # Inspect distinct IP addresses bound to different firewalls concurrently
+            fw_ip_map = {}
+            for m in current_mappings:
+                fw_ip_map.setdefault(str(m.firewall_id), set()).add(m.ip_address)
+            
+            distinct_fw_count = len(fw_ip_map)
+            all_ips = set(m.ip_address for m in current_mappings)
+
+            if distinct_fw_count > 1 and len(all_ips) > 1:
                 return DiagnosticCheck(
                     name="Identity Consistency", passed=False, status="WARNING",
                     code=DiagnosticCode.IDENTITY_INCONSISTENT.value, severity="high",
-                    detail=f"Conflicting IP mappings detected across firewalls: {list(unique_ips)}",
-                    evidence=f"User mapped to {len(unique_ips)} different IPs concurrently",
+                    detail=f"Conflicting active IP mappings detected across multiple firewalls: {list(all_ips)}",
+                    evidence=f"User concurrently mapped across {distinct_fw_count} firewalls with {len(all_ips)} distinct IPs",
                     action="Check for IP address overlap or stale User-ID mapping sessions."
                 )
 

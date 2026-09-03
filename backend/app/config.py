@@ -2,8 +2,8 @@ from pydantic_settings import BaseSettings
 from functools import lru_cache
 
 class Settings(BaseSettings):
-    database_url: str
-    sync_database_url: str
+    database_url: str = "postgresql+asyncpg://fwident:fwident_dev@localhost:5432/fwident"
+    sync_database_url: str = "postgresql+psycopg://fwident:fwident_dev@localhost:5432/fwident"
     provider: str = "mock"
     api_key: str = ""  # empty = no auth required
     cors_origins: str = "http://localhost:3000"

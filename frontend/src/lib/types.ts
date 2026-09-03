@@ -78,10 +78,12 @@ export interface AuthEvent {
 export interface DiagnosticCheck {
   name: string
   passed: boolean
+  status: 'PASSED' | 'FAILED' | 'WARNING' | 'SKIPPED'
   code: string
   severity: DiagnosticSeverity
   detail: string
-  action: string | null
+  evidence?: string | null
+  action?: string | null
 }
 
 export interface DiagnosticRun {

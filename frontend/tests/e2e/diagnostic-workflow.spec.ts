@@ -8,8 +8,8 @@ test.describe('Diagnostic Workflow', () => {
     await page.goto(BASE)
     await expect(page.locator('input[placeholder*="Search"]')).toBeVisible()
     
-    // 2. Search for a user
-    await page.fill('input[placeholder*="Search"]', 'alice')
+    // 2. Search for seed-deterministic user
+    await page.fill('input[placeholder*="Search"]', 'usr_0000001')
     await page.keyboard.press('Enter')
     await page.waitForURL('**/search**')
     
@@ -27,7 +27,7 @@ test.describe('Diagnostic Workflow', () => {
     await page.click('[data-testid="run-diagnostic-btn"]')
     await page.waitForURL('**/diagnostics**')
     
-    // 6. Select first firewall and run
+    // 6. Select firewall and run
     await page.waitForSelector('[data-testid="firewall-select"]')
     await page.selectOption('[data-testid="firewall-select"]', { index: 1 })
     await page.click('[data-testid="run-diagnostic-submit"]')
@@ -40,9 +40,8 @@ test.describe('Diagnostic Workflow', () => {
     await expect(page.locator('[data-testid="diagnostic-summary"]')).toBeVisible()
   })
   
-  test('unhealthy firewall shows FAILED status', async ({ page }) => {
-    // Navigate directly to a known user with a degraded/failed firewall
-    await page.goto(`${BASE}/search?q=firewall&type=firewall`)
+  test('search firewall roster', async ({ page }) => {
+    await page.goto(`${BASE}/search?q=fw-0001&type=firewall`)
     await expect(page.locator('[data-testid="search-result-firewall"]').first()).toBeVisible({ timeout: 10000 })
   })
 })

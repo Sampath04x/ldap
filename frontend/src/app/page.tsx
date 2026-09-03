@@ -2,7 +2,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { getHealth } from '../../lib/api'
+import { getHealth } from '@/lib/api'
 import { Search, ShieldAlert, Server, Users, ArrowRight } from 'lucide-react'
 import Link from 'next/link'
 

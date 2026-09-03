@@ -2,13 +2,13 @@
 
 import { useParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { getUser, getUserGroups, getUserMappings, getUserEvents } from '../../lib/api'
-import { HealthBadge } from '../../components/HealthBadge'
-import { GroupList } from '../../components/GroupList'
-import { IPMappingTable } from '../../components/IPMappingTable'
-import { AuthEventFeed } from '../../components/AuthEventFeed'
-import { Skeleton } from '../../components/Skeleton'
-import { ErrorState } from '../../components/ErrorState'
+import { getUser, getUserGroups, getUserMappings, getUserEvents } from '@/lib/api'
+import { HealthBadge } from '@/components/HealthBadge'
+import { GroupList } from '@/components/GroupList'
+import { IPMappingTable } from '@/components/IPMappingTable'
+import { AuthEventFeed } from '@/components/AuthEventFeed'
+import { Skeleton } from '@/components/Skeleton'
+import { ErrorState } from '@/components/ErrorState'
 import Link from 'next/link'
 import { ShieldAlert, Mail, Briefcase, MapPin, Calendar } from 'lucide-react'
 
@@ -82,7 +82,7 @@ export default function UserDetailPage() {
           </section>
           <section>
             <h2 className="text-xl font-semibold mb-4 text-gray-900">Recent Auth Events</h2>
-            {events ? <AuthEventFeed events={events} /> : <Skeleton className="h-64" />}
+            {events ? <AuthEventFeed events={events.items} /> : <Skeleton className="h-64" />}
           </section>
         </div>
         <div className="space-y-8">

@@ -2,11 +2,11 @@
 
 import { useParams } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { getFirewall, getFirewallLDAP } from '../../../lib/api'
-import { HealthBadge } from '../../../components/HealthBadge'
-import { LDAPStatus } from '../../../components/LDAPStatus'
-import { Skeleton } from '../../../components/Skeleton'
-import { ErrorState } from '../../../components/ErrorState'
+import { getFirewall, getFirewallLDAP } from '@/lib/api'
+import { HealthBadge } from '@/components/HealthBadge'
+import { LDAPStatus } from '@/components/LDAPStatus'
+import { Skeleton } from '@/components/Skeleton'
+import { ErrorState } from '@/components/ErrorState'
 import { Server, Activity, Network } from 'lucide-react'
 
 export default function FirewallDetailPage() {

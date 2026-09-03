@@ -44,7 +44,7 @@ export const getUserEvents = (username: string, params?: { after_id?: number, af
   if (params?.result) query.append('result', params.result)
   if (params?.page_size) query.append('page_size', String(params.page_size))
   const qs = query.toString()
-  return apiFetch<AuthEvent[]>(`/api/v1/users/${username}/events${qs ? `?${qs}` : ''}`)
+  return apiFetch<PagedResponse<AuthEvent>>(`/api/v1/users/${username}/events${qs ? `?${qs}` : ''}`)
 }
 
 // Firewall endpoints

@@ -8,23 +8,27 @@ from app.main import app
 from app.database import get_db
 from app.config import get_settings
 
-# Test settings
-TEST_DB_URL = "sqlite+aiosqlite:///:memory:"
+import os
+
+# Test database URL defaults to PostgreSQL test database
+TEST_DB_URL = os.environ.get(
+    "TEST_DATABASE_URL", 
+    "postgresql+asyncpg://fwident:fwident_dev@localhost:5432/fwident_test"
+)
 
 @pytest_asyncio.fixture(scope="session")
-def engine():
-    engine = create_async_engine(TEST_DB_URL, echo=False)
-    yield engine
-    engine.sync_engine.dispose()
+async def engine():
+    test_engine = create_async_engine(TEST_DB_URL, echo=False, pool_pre_ping=True)
+    yield test_engine
+    await test_engine.dispose()
 
 @pytest_asyncio.fixture
 async def test_db(engine):
     from app.models import Base
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
         await conn.run_sync(Base.metadata.create_all)
         
-    # Initialize some test data here if necessary
-    
     SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
     async with SessionLocal() as session:
         yield session

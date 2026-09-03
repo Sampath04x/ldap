@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, BigInteger, Boolean, Text, DateTime, JSON, ForeignKey, CheckConstraint, UniqueConstraint, Index, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from app.database import Base
 
 class User(Base):
@@ -135,7 +135,7 @@ class DiagnosticRun(Base):
     status = Column(String(16), nullable=False)
     overall_result = Column(String(32), nullable=False)
     overall_status = Column(String(16), nullable=False)
-    results_json = Column(JSON, nullable=False)
+    results_json = Column(JSONB, nullable=False)
     triggered_by = Column(String(64), nullable=True)
     duration_ms = Column(Integer, nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
@@ -154,7 +154,7 @@ class AuditLog(Base):
     resource_id = Column(Text, nullable=True)
     request_ip = Column(String(45), nullable=True)
     request_id = Column(String(36), nullable=True)
-    extra = Column(JSON, nullable=True)
+    extra = Column(JSONB, nullable=True)
     occurred_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
 # Indexes
