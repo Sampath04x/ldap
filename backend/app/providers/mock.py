@@ -33,14 +33,31 @@ class MockPaloAltoProvider(PaloAltoProvider):
         result = await self.session.execute(select(User).where(User.username == username))
         user = result.scalar_one_or_none()
         if not user:
-            return UserIdentity(found=False, username=username, status='unknown', display_name='', ldap_dn=None, detail="User not found")
+            return UserIdentity(found=False, username=username, status='unknown', display_name='', ldap_dn=None, detail="User not found in directory")
+            
+        # Verify if the target firewall currently has a User-ID mapping session for this user
+        ip_res = await self.session.execute(
+            select(UserIPMapping)
+            .where(UserIPMapping.user_id == user.id, UserIPMapping.firewall_id == firewall_id)
+        )
+        fw_mappings = ip_res.scalars().all()
+        if not fw_mappings:
+            return UserIdentity(
+                found=False,
+                username=user.username,
+                status=user.status,
+                display_name=user.display_name,
+                ldap_dn=user.ldap_dn,
+                detail=f"User '{username}' exists in directory but has no active User-ID session on firewall '{firewall_id}'."
+            )
+
         return UserIdentity(
             found=True,
             username=user.username,
             status=user.status,
             display_name=user.display_name,
             ldap_dn=user.ldap_dn,
-            detail="User found in database"
+            detail="User identified on firewall"
         )
 
     async def get_user_ip_mappings(self, username: str, firewall_id: str) -> list[IPMapping]:

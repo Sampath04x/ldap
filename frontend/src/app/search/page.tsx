@@ -9,15 +9,15 @@ import { Skeleton } from '@/components/Skeleton'
 import { ErrorState } from '@/components/ErrorState'
 import { EmptyState } from '@/components/EmptyState'
 import { useState } from 'react'
-
 export default function SearchPage() {
   const searchParams = useSearchParams()
   const q = searchParams.get('q') || ''
   const [filter, setFilter] = useState<'all' | 'user' | 'firewall' | 'group'>('all')
+  const [order, setOrder] = useState<'asc' | 'desc'>('asc')
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['search', q, filter],
-    queryFn: () => search({ q, type: filter === 'all' ? undefined : filter }),
+    queryKey: ['search', q, filter, order],
+    queryFn: () => search({ q, type: filter === 'all' ? undefined : filter, order }),
     enabled: !!q,
   })
 
@@ -27,20 +27,30 @@ export default function SearchPage() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
-      <div className="flex items-center justify-between border-b pb-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between border-b pb-4 gap-4">
         <h2 className="text-2xl font-bold">Search Results for "{q}"</h2>
-        <div className="flex space-x-2 bg-gray-100 p-1 rounded-lg">
-          {['all', 'user', 'firewall', 'group'].map((f) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f as any)}
-              className={`px-4 py-1.5 rounded-md text-sm font-medium capitalize transition-colors ${
-                filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              {f}
-            </button>
-          ))}
+        <div className="flex items-center space-x-3 flex-wrap gap-2">
+          <div className="flex space-x-1 bg-gray-100 p-1 rounded-lg">
+            {['all', 'user', 'firewall', 'group'].map((f) => (
+              <button
+                key={f}
+                onClick={() => setFilter(f as any)}
+                className={`px-3 py-1.5 rounded-md text-xs font-semibold capitalize transition-colors ${
+                  filter === f ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+          <select
+            value={order}
+            onChange={(e) => setOrder(e.target.value as 'asc' | 'desc')}
+            className="text-xs bg-white border border-gray-300 rounded-lg px-2.5 py-1.5 font-medium shadow-sm"
+          >
+            <option value="asc">Sort: A-Z (Ascending)</option>
+            <option value="desc">Sort: Z-A (Descending)</option>
+          </select>
         </div>
       </div>
 

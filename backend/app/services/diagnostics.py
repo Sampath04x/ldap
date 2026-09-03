@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import Optional
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import time
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
@@ -269,20 +269,36 @@ class DiagnosticEngine:
         )
 
     async def _check_group_membership(self, username: str, firewall_id: str) -> tuple[DiagnosticCheck, list[str]]:
-        groups = await self.provider.get_user_groups(username, firewall_id)
-        if not groups:
+        user_groups = await self.provider.get_user_groups(username, firewall_id)
+        if not user_groups:
             return DiagnosticCheck(
                 name="Group Membership", passed=False, status="WARNING",
                 code=DiagnosticCode.GROUP_MAPPING_EMPTY.value, severity="medium",
                 detail="User has no active group memberships retrieved.",
                 evidence="0 group memberships found for user", action="Verify Active Directory group assignments."
-            ), groups
+            ), user_groups
+
+        # Compare user's AD groups against target firewall's mapped groups
+        fw_state = await self.provider.get_group_mapping_state(firewall_id)
+        mapped_set = set(fw_state.mapped_groups) if fw_state.mapped_groups else set()
+        missing_groups = set(user_groups) - mapped_set
+
+        if missing_groups and mapped_set:
+            missing_list = list(missing_groups)
+            return DiagnosticCheck(
+                name="Group Membership", passed=False, status="WARNING",
+                code=DiagnosticCode.GROUP_MAPPING_EMPTY.value, severity="high",
+                detail=f"User belongs to {len(user_groups)} group(s), but {len(missing_list)} group(s) are missing from target firewall mapping profile.",
+                evidence=f"User groups: {user_groups[:3]}, Firewall mapped: {fw_state.mapped_groups[:3]}, Missing on firewall: {missing_list[:3]}",
+                action="Add missing groups to the Group Mapping Inclusion List on PAN-OS."
+            ), user_groups
+
         return DiagnosticCheck(
             name="Group Membership", passed=True, status="PASSED",
             code=DiagnosticCode.OK.value, severity="info",
-            detail=f"User belongs to {len(groups)} group(s).",
-            evidence=f"Groups: {groups[:5]}{'...' if len(groups)>5 else ''}", action=None
-        ), groups
+            detail=f"User belongs to {len(user_groups)} group(s) and all are mapped on firewall.",
+            evidence=f"Groups: {user_groups[:5]}{'...' if len(user_groups)>5 else ''}", action=None
+        ), user_groups
 
     async def _check_group_mapping_freshness(self, firewall_id: str) -> DiagnosticCheck:
         state = await self.provider.get_group_mapping_state(firewall_id)
@@ -293,8 +309,8 @@ class DiagnosticEngine:
                 detail="No group mappings synced to firewall.",
                 evidence="Group mapping list is empty", action="Trigger PAN-OS group mapping sync."
             )
-        if state.status == 'stale' or (state.age_hours and state.age_hours > self.settings.group_mapping_stale_hours):
-            age_str = f"{state.age_hours:.1f}" if state.age_hours else "unknown"
+        if state.status == 'stale' or state.age_hours is None or state.age_hours > self.settings.group_mapping_stale_hours:
+            age_str = f"{state.age_hours:.1f}" if state.age_hours is not None else "unknown"
             return DiagnosticCheck(
                 name="Group Mapping Freshness", passed=False, status="WARNING",
                 code=DiagnosticCode.GROUP_MAPPING_STALE.value, severity="medium",

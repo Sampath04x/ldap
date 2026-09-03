@@ -36,12 +36,12 @@ async def test_db(engine):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
 
+import httpx
+
 @pytest_asyncio.fixture
 async def client(test_db):
     app.dependency_overrides[get_db] = lambda: test_db
-    
-    # We could also mock the PaloAltoProvider here
-    
-    async with AsyncClient(app=app, base_url="http://testserver") as client:
+    transport = httpx.ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://testserver") as client:
         yield client
     app.dependency_overrides.clear()

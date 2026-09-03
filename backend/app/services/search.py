@@ -51,7 +51,7 @@ class SearchService:
         elif field == 'email':
             base_query = base_query.where(User.email == q)
         elif field == 'ip' or is_ip:
-            base_query = base_query.join(UserIPMapping).where(UserIPMapping.ip_address == q)
+            base_query = base_query.join(UserIPMapping).where(UserIPMapping.ip_address == q).distinct()
         else:
             safe_q = q.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
             base_query = base_query.where(
@@ -84,7 +84,16 @@ class SearchService:
             SearchItem(
                 type='user',
                 score=1.0 if u.username == q else 0.5,
-                data={"id": str(u.id), "username": u.username, "display_name": u.display_name, "status": u.status}
+                data={
+                    "id": str(u.id), 
+                    "username": u.username, 
+                    "email": u.email, 
+                    "display_name": u.display_name, 
+                    "department": u.department,
+                    "job_title": u.job_title,
+                    "location": u.location,
+                    "status": u.status
+                }
             ) for u in users
         ]
         return items, total
@@ -116,7 +125,16 @@ class SearchService:
             SearchItem(
                 type='firewall',
                 score=1.0 if f.hostname == q else 0.5,
-                data={"id": str(f.id), "hostname": f.hostname, "ip_address": f.ip_address, "status": f.status}
+                data={
+                    "id": str(f.id), 
+                    "hostname": f.hostname, 
+                    "ip_address": f.ip_address, 
+                    "model": f.model,
+                    "software_version": f.software_version,
+                    "environment": f.environment,
+                    "location": f.location,
+                    "status": f.status
+                }
             ) for f in firewalls
         ]
         return items, total

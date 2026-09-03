@@ -1,4 +1,4 @@
-import type { IPMapping } from '../../lib/types'
+import type { IPMapping } from '@/lib/types'
 import { EmptyState } from './EmptyState'
 
 function formatAge(dateStr: string) {

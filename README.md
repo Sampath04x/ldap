@@ -1,4 +1,4 @@
-# Enterprise Firewall Identity & LDAP Diagnostics Platform
+ï»¿# Enterprise Firewall Identity & LDAP Diagnostics Platform
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com/)
@@ -179,7 +179,7 @@ The generator (`data_generator/generate.py`) uses `psycopg3` `COPY FROM STDIN` s
 
 | Diagnostic Code | Severity | Meaning & Trigger Condition |
 |---|---|---|
-| `IDENTITY_HEALTHY` | — | All 9 diagnostic checks passed |
+| `IDENTITY_HEALTHY` | ï¿½ | All 9 diagnostic checks passed |
 | `FIREWALL_UNREACHABLE` | `critical` | Firewall ping/management interface unreachable |
 | `USER_NOT_FOUND` | `critical` | Username not present in identity database |
 | `USER_NOT_IDENTIFIED` | `high` | Account is present but in `disabled` or `locked` state |

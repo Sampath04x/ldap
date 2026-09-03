@@ -1,4 +1,4 @@
-import type { Group } from '../../lib/types'
+import type { Group } from '@/lib/types'
 import { Users } from 'lucide-react'
 
 export function GroupList({ groups }: { groups: Group[] }) {

@@ -198,7 +198,8 @@ async def test_scenario_authentication_failures(test_db):
 
     fw = Firewall(id=uuid.UUID(fw_id), hostname="fw-authfail.corp", ip_address="10.0.0.11", status="reachable")
     user = User(id=uuid.UUID(user_id), username=username, email=f"{username}@corp.com", display_name="Auth Fail User", status="active")
-    ldap = LDAPServer(id=uuid.UUID(user_id), firewall_id=uuid.UUID(fw_id), profile_name="default", server_host="10.0.0.250", status="reachable")
+    ldap_id = str(uuid.uuid4())
+    ldap = LDAPServer(id=uuid.UUID(ldap_id), firewall_id=uuid.UUID(fw_id), profile_name="default", server_host="10.0.0.250", status="reachable")
     ipm = UserIPMapping(user_id=uuid.UUID(user_id), firewall_id=uuid.UUID(fw_id), ip_address="10.1.1.56", mapped_at=datetime.now(timezone.utc), is_current=True)
 
     # 4 auth failure events in past hour

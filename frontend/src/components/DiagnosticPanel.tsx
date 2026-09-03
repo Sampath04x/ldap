@@ -37,8 +37,8 @@ export function DiagnosticPanel({ run }: { run: DiagnosticRun }) {
               const passed = check.passed
               const isSkipped = check.code === 'SKIPPED'
               const statusStr = check.status || (passed ? 'PASSED' : isSkipped ? 'SKIPPED' : check.severity === 'critical' ? 'FAILED' : 'WARNING')
-              const actionStr = check.action || check.recommended_action
-              const detailStr = check.detail || check.message
+              const actionStr = check.action
+              const detailStr = check.detail
 
               return (
                 <div 
@@ -70,8 +70,8 @@ export function DiagnosticPanel({ run }: { run: DiagnosticRun }) {
                     <div className="flex-1 min-w-0 space-y-2">
                       <div className="flex items-center justify-between flex-wrap gap-2">
                         <div className="flex items-center space-x-2">
-                          <span className="font-semibold text-gray-900">{check.name || check.check}</span>
-                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded font-mono border">{check.code || check.diagnostic_code}</span>
+                          <span className="font-semibold text-gray-900">{check.name}</span>
+                          <span className="text-xs px-2 py-0.5 bg-gray-100 text-gray-700 rounded font-mono border">{check.code}</span>
                         </div>
                         <div className="flex items-center space-x-2">
                           <span className={`text-xs px-2 py-0.5 rounded font-bold uppercase ${

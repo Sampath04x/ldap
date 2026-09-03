@@ -1,4 +1,4 @@
-import type { LDAPServer } from '../../lib/types'
+import type { LDAPServer } from '@/lib/types'
 import { HealthBadge } from './HealthBadge'
 import { Lock, Unlock } from 'lucide-react'
 

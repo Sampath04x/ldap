@@ -1,4 +1,4 @@
-import type { AuthEvent } from '../../lib/types'
+import type { AuthEvent } from '@/lib/types'
 import { EmptyState } from './EmptyState'
 import { HealthBadge } from './HealthBadge'
 

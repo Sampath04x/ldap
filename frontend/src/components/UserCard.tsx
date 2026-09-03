@@ -1,4 +1,4 @@
-import type { User } from '../../lib/types'
+import type { User } from '@/lib/types'
 import { HealthBadge } from './HealthBadge'
 import Link from 'next/link'
 import { User as UserIcon } from 'lucide-react'

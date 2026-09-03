@@ -1,6 +1,6 @@
 import type {
   User, Group, IPMapping, AuthEvent, Firewall, LDAPServer,
-  DiagnosticRun, SearchResult, PagedResponse, HealthResponse
+  DiagnosticRun, SearchResult, PagedResponse, KeysetResponse, HealthResponse
 } from './types'
 
 export const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000'
@@ -44,7 +44,7 @@ export const getUserEvents = (username: string, params?: { after_id?: number, af
   if (params?.result) query.append('result', params.result)
   if (params?.page_size) query.append('page_size', String(params.page_size))
   const qs = query.toString()
-  return apiFetch<PagedResponse<AuthEvent>>(`/api/v1/users/${username}/events${qs ? `?${qs}` : ''}`)
+  return apiFetch<KeysetResponse<AuthEvent>>(`/api/v1/users/${username}/events${qs ? `?${qs}` : ''}`)
 }
 
 // Firewall endpoints

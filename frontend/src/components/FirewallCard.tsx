@@ -1,4 +1,4 @@
-import type { Firewall } from '../../lib/types'
+import type { Firewall } from '@/lib/types'
 import { HealthBadge } from './HealthBadge'
 import Link from 'next/link'
 import { Server } from 'lucide-react'

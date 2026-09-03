@@ -112,6 +112,17 @@ export interface SearchResult {
   has_more: boolean
 }
 
+export interface KeysetCursor {
+  after_id: number | null
+  after_ts: string | null
+}
+
+export interface KeysetResponse<T> {
+  items: T[]
+  has_more: boolean
+  next_cursor: KeysetCursor | null
+}
+
 export interface PagedResponse<T> {
   items: T[]
   total: number

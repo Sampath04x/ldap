@@ -1,5 +1,5 @@
 from sqlalchemy import Column, String, Integer, BigInteger, Boolean, Text, DateTime, JSON, ForeignKey, CheckConstraint, UniqueConstraint, Index, func
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 from app.database import Base
 
 class User(Base):
@@ -46,7 +46,7 @@ class Firewall(Base):
     __tablename__ = 'firewalls'
     id = Column(UUID(as_uuid=True), primary_key=True)
     hostname = Column(String(255), unique=True, nullable=False)
-    ip_address = Column(String(45), nullable=False)
+    ip_address = Column(INET, nullable=False)
     model = Column(String(64), nullable=True)
     software_version = Column(String(32), nullable=True)
     environment = Column(String(32), server_default='production')
@@ -85,7 +85,7 @@ class UserIPMapping(Base):
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=False)
     firewall_id = Column(UUID(as_uuid=True), ForeignKey('firewalls.id'), nullable=False)
-    ip_address = Column(String(45), nullable=False)
+    ip_address = Column(INET, nullable=False)
     mapped_at = Column(DateTime(timezone=True), nullable=False)
     expires_at = Column(DateTime(timezone=True), nullable=True)
     is_current = Column(Boolean, nullable=False, server_default='true')
@@ -114,7 +114,7 @@ class AuthenticationEvent(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey('users.id'), nullable=True)
     firewall_id = Column(UUID(as_uuid=True), ForeignKey('firewalls.id'), nullable=False)
     username_raw = Column(String(128), nullable=False)
-    source_ip = Column(String(45), nullable=True)
+    source_ip = Column(INET, nullable=True)
     result = Column(String(16), nullable=False)
     failure_reason = Column(String(64), nullable=True)
     auth_method = Column(String(32), nullable=True)
@@ -152,7 +152,7 @@ class AuditLog(Base):
     action = Column(String(64), nullable=False)
     resource_type = Column(String(32), nullable=True)
     resource_id = Column(Text, nullable=True)
-    request_ip = Column(String(45), nullable=True)
+    request_ip = Column(INET, nullable=True)
     request_id = Column(String(36), nullable=True)
     extra = Column(JSONB, nullable=True)
     occurred_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
