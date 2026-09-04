@@ -118,7 +118,12 @@ def generate(preset, seed, truncate):
     avg_per_user = max(1, n_memberships // n_users)
     with conn.cursor() as cur:
         with cur.copy("COPY user_group_memberships (user_id, group_id, source, created_at) FROM STDIN") as copy:
-            count = 0
+            # Guarantee explicit memberships for test fixtures
+            copy.write_row((users[0][0], groups[0], 'ldap', datetime.now(timezone.utc)))
+            if len(users) >= 6 and len(groups) >= 6:
+                copy.write_row((users[5][0], groups[5], 'ldap', datetime.now(timezone.utc)))
+
+            count = 2
             for u_idx, u in enumerate(users):
                 if count >= n_memberships:
                     break
@@ -140,13 +145,18 @@ def generate(preset, seed, truncate):
         with cur.copy("COPY user_ip_mappings (user_id, firewall_id, ip_address, mapped_at, is_current, created_at) FROM STDIN") as copy:
             # Ensure usr_0000001 (users[0]) has current mapping on fw-0001 (firewalls[0])
             copy.write_row((users[0][0], firewalls[0], "10.1.1.100", datetime.now(timezone.utc), True, datetime.now(timezone.utc)))
+            
+            # Ensure usr_0000006 has mapping on fw-0001 for group check
+            if len(users) >= 6:
+                copy.write_row((users[5][0], firewalls[0], "10.1.1.106", datetime.now(timezone.utc), True, datetime.now(timezone.utc)))
+
             # usr_0000011 has conflicting active mappings on firewalls[0] and firewalls[3]
             if len(users) >= 11 and len(firewalls) >= 4:
                 copy.write_row((users[10][0], firewalls[0], "10.1.1.200", datetime.now(timezone.utc), True, datetime.now(timezone.utc)))
                 copy.write_row((users[10][0], firewalls[3], "10.2.2.200", datetime.now(timezone.utc), True, datetime.now(timezone.utc)))
 
             for idx, u in enumerate(users[1:]):
-                if idx + 1 in (7, 10): # Skip usr_0000008 (not identified)
+                if idx + 1 in (0, 5, 7, 10): # Skip predefined custom users
                     continue
                 if rand.random() > 0.1:
                     u_id = u[0]
@@ -160,7 +170,14 @@ def generate(preset, seed, truncate):
         with cur.copy("COPY firewall_group_mappings (firewall_id, group_id, ldap_server_id, status, synced_at, created_at, updated_at) FROM STDIN") as copy:
             for fw_id in firewalls:
                 ldap_id = fw_ldap_map.get(fw_id)
-                sampled_groups = rand.sample(groups, min(len(groups), 100))
+                sampled_groups = set(rand.sample(groups, min(len(groups), 100)))
+                
+                # For fw-0001 (firewalls[0]), ensure groups[0] IS mapped and groups[5] IS NOT mapped
+                if fw_id == firewalls[0]:
+                    sampled_groups.add(groups[0])
+                    if len(groups) >= 6:
+                        sampled_groups.discard(groups[5])
+
                 for g_id in sampled_groups:
                     copy.write_row((fw_id, g_id, ldap_id, 'active', datetime.now(timezone.utc), datetime.now(timezone.utc), datetime.now(timezone.utc)))
         conn.commit()

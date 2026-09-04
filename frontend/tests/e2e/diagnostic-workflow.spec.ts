@@ -27,13 +27,14 @@ test.describe('Diagnostic Workflow', () => {
     await page.click('[data-testid="run-diagnostic-btn"]')
     await page.waitForURL('**/diagnostics**')
     
-    // 6. Select firewall and run
+    // 6. Select healthy firewall fw-0001 and run
     await page.waitForSelector('[data-testid="firewall-select"]')
-    await page.selectOption('[data-testid="firewall-select"]', { index: 1 })
+    await page.selectOption('[data-testid="firewall-select"]', { label: 'fw-0001.corp.internal' })
     await page.click('[data-testid="run-diagnostic-submit"]')
     
-    // 7. Wait for result
+    // 7. Wait for result & assert HEALTHY status
     await expect(page.locator('[data-testid="diagnostic-overall-status"]')).toBeVisible({ timeout: 15000 })
+    await expect(page.locator('[data-testid="diagnostic-overall-status"]')).toContainText('HEALTHY')
     
     // 8. Verify checks are shown
     await expect(page.locator('[data-testid="diagnostic-check"]').first()).toBeVisible()

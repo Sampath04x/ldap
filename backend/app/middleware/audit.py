@@ -48,11 +48,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
             "status_code": response.status_code
         }
         
-        # In a real app we might use BackgroundTasks from FastAPI, but middleware needs custom handling
-        # Using simple create_task for background execution in Starlette
-        import asyncio
-        asyncio.create_task(
-            log_audit_event(
+        try:
+            await log_audit_event(
                 actor=actor,
                 action=action,
                 resource_type=resource_type,
@@ -61,6 +58,8 @@ class AuditMiddleware(BaseHTTPMiddleware):
                 request_id=request_id,
                 extra=extra
             )
-        )
+        except Exception as e:
+            import logging
+            logging.error(f"Failed to record audit log: {e}")
 
         return response

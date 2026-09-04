@@ -23,15 +23,16 @@ class SearchService:
         elif type == 'group' or (field == 'group_name'):
             items, total = await self._search_groups_paginated(db, q, field, status, page_size, offset, sort, order)
         else:
-            # Type is 'all'
-            user_items, user_total = await self._search_users_paginated(db, q, field, is_ip, status, 15, 0, sort, order)
-            fw_items, fw_total = await self._search_firewalls_paginated(db, q, field, status, 15, 0, sort, order)
-            grp_items, grp_total = await self._search_groups_paginated(db, q, field, status, 15, 0, sort, order)
+            # Type is 'all': fetch candidate slices up to page_size from each category for current offset
+            per_cat_limit = max(page_size, 10)
+            user_items, user_total = await self._search_users_paginated(db, q, field, is_ip, status, per_cat_limit, offset, sort, order)
+            fw_items, fw_total = await self._search_firewalls_paginated(db, q, field, status, per_cat_limit, offset, sort, order)
+            grp_items, grp_total = await self._search_groups_paginated(db, q, field, status, per_cat_limit, offset, sort, order)
             
             all_items = user_items + fw_items + grp_items
             all_items.sort(key=lambda x: x.score, reverse=True)
             total = user_total + fw_total + grp_total
-            items = all_items[offset:offset + page_size]
+            items = all_items[:page_size]
 
         return SearchResult(
             items=items,
