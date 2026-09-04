@@ -1,4 +1,4 @@
-﻿# Enterprise Firewall Identity & LDAP Diagnostics Platform
+# Enterprise Firewall Identity & LDAP Diagnostics Platform
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-0.115-green.svg)](https://fastapi.tiangolo.com/)
@@ -108,10 +108,8 @@ cp .env.example .env
 docker compose up -d --build
 ```
 
-### Step 3: Run Database Migrations
-```bash
-docker compose exec backend alembic upgrade head
-```
+### Step 3: Automatic Database Migrations
+Migrations run automatically on container startup via `entrypoint.sh`. (If running manually, execute `docker compose exec backend alembic upgrade head`).
 
 ### Step 4: Seed Synthetic Dataset
 ```bash
@@ -173,6 +171,23 @@ The generator (`data_generator/generate.py`) uses `psycopg3` `COPY FROM STDIN` s
 | `large` | 1,000,000 | 20,000 | 5,000,000 | 500 | 10,000,000 | ~20 min |
 | `stress` | 5,000,000 | 50,000 | 20,000,000 | 2,000 | 50,000,000 | ~90 min |
 
+### Deterministic Failure Scenario User Fixtures
+The generator embeds 11 seed-deterministic user accounts designed for reproducible testing and live UI demonstrations against target firewall `fw-0001.corp.internal`:
+
+| Test Username | Target Firewall | Expected Overall Status | Diagnostic Code | Scenario Description |
+|---|---|---|---|---|
+| `usr_0000001` | `fw-0001` | `HEALTHY` | `IDENTITY_HEALTHY` | All 9 diagnostic checks pass cleanly |
+| `usr_0000002` | `fw-0002` | `FAILED` | `FIREWALL_UNREACHABLE` | Target firewall management IP is unreachable |
+| `usr_0000003` | `fw-0003` | `FAILED` | `LDAP_NOT_CONFIGURED` | Target firewall has no LDAP profiles configured |
+| `usr_0000004` | `fw-0001` | `DEGRADED` | `IDENTITY_MAPPING_STALE` | Current IP mapping is 12 hours old (>8h threshold) |
+| `usr_0000005` | `fw-0001` | `DEGRADED` | `AUTHENTICATION_FAILURE` | 4 recent authentication failure events in past 15 min |
+| `usr_0000006` | `fw-0001` | `DEGRADED` | `GROUP_MAPPING_EMPTY` | User group `GRP-0006` missing from firewall mapping profile |
+| `usr_0000007` | `fw-0001` | `DEGRADED` | `USER_INACTIVE` | Account status set to `inactive` in directory |
+| `usr_0000008` | `fw-0001` | `FAILED` | `USER_NOT_IDENTIFIED` | User exists in AD, but has no active session on target firewall |
+| `usr_0000009` | `fw-0001` | `FAILED` | `LDAP_TLS_FAILURE` | LDAP server profile status is `tls_error` |
+| `usr_0000010` | `fw-0010` | `DEGRADED` | `GROUP_MAPPING_STALE` | Firewall group refresh cache is 30h old (>24h threshold) |
+| `usr_0000011` | `fw-0001` | `DEGRADED` | `IDENTITY_INCONSISTENT` | Active IP session mappings on both `fw-0001` and `fw-0004` |
+
 ---
 
 ## 8. Diagnostic Codes & Severity Matrix
@@ -221,7 +236,8 @@ The scenario test suite (`tests/test_scenarios.py`) includes explicit end-to-end
 
 ## 11. Performance Benchmark Results
 
-Measured query performance runner (`benchmarks/bench.py`) executing against PostgreSQL with `dev` dataset:
+> [!NOTE]
+> Example benchmark measurements. Execute `python benchmarks/bench.py --preset dev` to generate live hardware-specific measurements for your system environment.
 
 | Scenario | Min (ms) | P50 (ms) | P95 (ms) | P99 (ms) | Max (ms) | Throughput (QPS) |
 |---|---|---|---|---|---|---|
